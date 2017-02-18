@@ -89,18 +89,64 @@ function getAttrItem(itemPath,callback) {
         }
     });
 }
-
-getAttrDir('./appsrv',(err,result)=>{
-    if(err) throw err;
-    fs.readFile('./appsrv/out.json',(err,result1)=>{
-        
+let filesArray=[];
+fs.readFile('./appsrv/out.json',(err,result1)=>{
+    const my_object = JSON.parse(result1);
+    extractFiles(my_object,null,(err)=>{
+        if(err) throw err;
+       console.log(`files count ${filesArray.length}`);
     });
+    //console.log(`result of opening file: ${result1}`);
+});
+/*getAttrDir('./appsrv/lib',(err,result)=>{
+    if(err) throw err;
+    /!*fs.readFile('./appsrv/out.json',(err,result1)=>{
+        const my_object = JSON.parse(result1);
+        console.log(`result of opening file: ${result1}`);
+    });*!/
     fs.writeFile('./appsrv/out.json',JSON.stringify(result),(err,result2)=>{
         if(err) throw err;
         console.log(`result of saving file: ${result2}`);
     });
     //console.log(result);
-});
+});*/
+
+const extractFiles = (_object,path,_callback)=>{
+    //for()
+    if((_object.type=='directory')&&(_object.items))
+    {
+       //идем вглубь
+        /*_object.items.forEach((item)=>{
+            extractFiles(item,(err)=>{if(err) return _callback(err)});
+        });*/
+        for(let key in _object.items)
+        {
+            extractFiles(_object.items[key],key,(err)=>{if(err) return _callback(err)});
+        }
+    }
+    else if(_object.type=='file')
+    {
+        _object.path=path;
+        filesArray.push(_object);
+    }
+    else {
+        _callback(new Error("Error!!!"));
+    }
+};
+const findChangedFiles=(input_object_old,input_object_new,callback)=>{
+    let changedFiles=[];
+    //у каждого объекта вынимаем все названия файлов
+    async.parallel([
+            (cb)=>{
+                //вынимаем все файлы из object_old
+            },
+            (cb)=>{
+                //вынимаем все файлы из object_new
+            },
+        ],
+        (err,results)=>{});
+}
+
 
 class CheckFiles
 {
