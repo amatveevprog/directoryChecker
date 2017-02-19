@@ -90,21 +90,21 @@ function getAttrItem(itemPath,callback) {
     });
 }
 let filesArray=[];
-fs.readFile('./appsrv/out.json',(err,result1)=>{
+fs.readFile('./out.json',(err,result1)=>{
     const my_object = JSON.parse(result1);
-    extractFiles(my_object,null,(err)=>{
+    extractFiles(my_object,null,(err,filesArr)=>{
         if(err) throw err;
-       console.log(`files count ${filesArray.length}`);
+       console.log(`files count ${filesArray.length} \r\n ${JSON.stringify(filesArr)}`);
     });
     //console.log(`result of opening file: ${result1}`);
 });
-/*getAttrDir('./appsrv/lib',(err,result)=>{
+/*getAttrDir('./1',(err,result)=>{
     if(err) throw err;
     /!*fs.readFile('./appsrv/out.json',(err,result1)=>{
         const my_object = JSON.parse(result1);
         console.log(`result of opening file: ${result1}`);
     });*!/
-    fs.writeFile('./appsrv/out.json',JSON.stringify(result),(err,result2)=>{
+    fs.writeFile('./out.json',JSON.stringify(result),(err,result2)=>{
         if(err) throw err;
         console.log(`result of saving file: ${result2}`);
     });
@@ -132,6 +132,7 @@ const extractFiles = (_object,path,_callback)=>{
     else {
         _callback(new Error("Error!!!"));
     }
+    _callback(null,filesArray);
 };
 const findChangedFiles=(input_object_old,input_object_new,callback)=>{
     let changedFiles=[];
@@ -139,10 +140,11 @@ const findChangedFiles=(input_object_old,input_object_new,callback)=>{
     async.parallel([
             (cb)=>{
                 //вынимаем все файлы из object_old
+                
             },
             (cb)=>{
                 //вынимаем все файлы из object_new
-            },
+            }
         ],
         (err,results)=>{});
 }
