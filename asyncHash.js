@@ -6,7 +6,8 @@ const
     async = require('async'),
     //bunyan = require('bunyan'),
     crypto = require('crypto'),
-    path = require('path');
+    path = require('path'),
+    mkdirp = require('mkdirp');
 let qHashFile = async.queue((args,callback)=>{
     //объект для расчета контрольной суммы:
     const oHash = crypto.createHash('md5');
@@ -21,6 +22,9 @@ let qHashFile = async.queue((args,callback)=>{
         callback();
     });
 },16); //Максимальное количество одновременно расчитываемых контрольных сумм для файлов
+
+let arrRecentlyCheckedFiles=[];
+
 //получение атрибутов директории...
 function getAttrDir (dirPath,callback) {
     fs.readdir(dirPath,(err,items)=>{
@@ -90,57 +94,142 @@ function getAttrItem(itemPath,callback) {
     });
 }
 let filesArray=[];
-fs.readFile('./out.json',(err,result1)=>{
+
+/*fs.readFile('./out.json',(err,result1)=>{
     const my_object = JSON.parse(result1);
     extractFiles(my_object,null,(err,filesArr)=>{
         if(err) throw err;
-       console.log(`files count ${filesArray.length} \r\n ${JSON.stringify(filesArr)}`);
+        console.log(`files count ${filesArray.length}`);
     });
     //console.log(`result of opening file: ${result1}`);
-});
-/*getAttrDir('./1',(err,result)=>{
-    if(err) throw err;
-    /!*fs.readFile('./appsrv/out.json',(err,result1)=>{
-        const my_object = JSON.parse(result1);
-        console.log(`result of opening file: ${result1}`);
-    });*!/
-    fs.writeFile('./out.json',JSON.stringify(result),(err,result2)=>{
-        if(err) throw err;
-        console.log(`result of saving file: ${result2}`);
-    });
-    //console.log(result);
 });*/
 
-const extractFiles = (_object,path,_callback)=>{
-    //for()
-    if((_object.type=='directory')&&(_object.items))
-    {
-       //идем вглубь
-        /*_object.items.forEach((item)=>{
-            extractFiles(item,(err)=>{if(err) return _callback(err)});
-        });*/
-        for(let key in _object.items)
+getAttrDir('./appsrv/lib', (err, result) => {
+    const dir = './appsrv/checksum';
+
+    if (err) throw err;
+    //async.parallel()
+    //проверка на существование файла с данными.
+    mkdirp(dir,(err)=>{
+       fs.stat(`${dir}/out.json`,(err,stats)=>{
+           if(err) {
+               if (err.code = 'ENOENT') {
+                   console.log('[STATS]:no file out.json : creating one...');
+                   fs.writeFile(`${dir}/out.json`, JSON.stringify(result), (err) => {
+                       if (err) {
+                           console.log(`[STATS]:error saving file: ${err}`);
+                       }
+                       else {
+                           console.log(`[STATS]:file saved: ${err}`);
+                       }
+                       //FILE WAS SAVED
+                       //сохраняем файл и выходим, ничего не сравнивая
+                   });
+               }
+           }
+           else {
+               //файл out.json есть
+               //сравниваем содержимое файла и того, что мы только что считали.
+               async.parallel([
+                       (cb)=>{
+                           //вынимаем все 'файлы' из файла, который есть на диске
+                           fs.readFile(`${dir}/out.json`, (err, result1) => {
+                               const my_object = JSON.parse(result1);
+                               //преобразовываем его в нужный нам объект:
+                               extractFromJSON(my_object,cb);
+                               //console.log(`result of opening file: ${result1}`);
+                           });
+                       },
+                       (cb)=>{
+                           //вынимаем все 'файлы' из текущего анализа
+                           extractFromJSON(result,cb);
+                       }
+                   ],
+                   (err,results)=>{
+                   console.log('aaaaaaaaaaaa');
+                       /*fs.writeFile(JSON.stringify(results),(err,res)=>{
+                           if(err) throw err;
+                           console.log(`{Урра!} ${res}`);
+                       });*/
+                   });
+           }
+
+       });
+    });
+
+    fs.stat(dir,(err,stats)=>{
+        if(err)
         {
-            extractFiles(_object.items[key],key,(err)=>{if(err) return _callback(err)});
+            if(err.code='ENOENT');
+            {
+                console.log('[STATS-1]:no directory: creating one...');
+                fs.mkdirSync(dir,)
+            }
+            //создаем данный файл, создаем результирующий файл
+            fs.stat('./appsrv/checksum/out.json',(err,result)=>{
+
+            });
         }
-    }
-    else if(_object.type=='file')
-    {
-        _object.path=path;
-        filesArray.push(_object);
-    }
-    else {
-        _callback(new Error("Error!!!"));
-    }
-    _callback(null,filesArray);
+        console.log(stats);
+    });
+    /*extractFromJSON(result,(err, result2)=>{
+        if(err) throw err;
+        console.log(`[extractFrom JSON]: the result of opening and analyzing files: count-> ${result2.length} 1st elem: ${result2[0]} overall length:${result.size} bytes`);
+
+    });*/
+
+
+    /*fs.readFile('./appsrv/out.json', (err, result1) => {
+        const my_object = JSON.parse(result1);
+
+        //console.log(`result of opening file: ${result1}`);
+    });
+
+    fs.writeFile('./out.json', JSON.stringify(result), (err, result2) => {
+        if (err) throw err;
+        console.log(`result of saving file: ${result2}`);
+    });*/
+    //console.log(result);
+});
+
+
+//взять файлы из объекта JSON
+const extractFromJSON = (_object_,_callback_)=>
+{
+    let filesArray=[];
+    const extractFiles = (_object,path,_callback)=>{
+        //for()
+        if((_object.type=='directory')&&(_object.items))
+        {
+            //идем вглубь
+            for(let key in _object.items)
+            {
+                extractFiles(_object.items[key],key,(err)=>{if(err) return _callback(err)});
+            }
+        }
+        else if(_object.type=='file')
+        {
+            _object.path=path;
+            filesArray.push(_object);
+        }
+        else {
+            _callback(new Error("Error!!!"));
+        }
+        _callback(null,filesArray);
+    };
+    return extractFiles(_object_,null,_callback_);
 };
+
+
+
+
 const findChangedFiles=(input_object_old,input_object_new,callback)=>{
     let changedFiles=[];
     //у каждого объекта вынимаем все названия файлов
     async.parallel([
             (cb)=>{
                 //вынимаем все файлы из object_old
-                
+
             },
             (cb)=>{
                 //вынимаем все файлы из object_new
