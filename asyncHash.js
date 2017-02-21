@@ -7,7 +7,8 @@ const
     //bunyan = require('bunyan'),
     crypto = require('crypto'),
     path = require('path'),
-    mkdirp = require('mkdirp');
+    mkdirp = require('mkdirp'),
+    moment = require('moment');
 let qHashFile = async.queue((args,callback)=>{
     //объект для расчета контрольной суммы:
     const oHash = crypto.createHash('md5');
@@ -133,6 +134,7 @@ getAttrDir('./appsrv/lib', (err, result) => {
                async.parallel([
                        (cb)=>{
                            //вынимаем все 'файлы' из файла, который есть на диске
+                           //# прошлый снимок
                            fs.readFile(`${dir}/out.json`, (err, result1) => {
                                const my_object = JSON.parse(result1);
                                //преобразовываем его в нужный нам объект:
@@ -142,11 +144,75 @@ getAttrDir('./appsrv/lib', (err, result) => {
                        },
                        (cb)=>{
                            //вынимаем все 'файлы' из текущего анализа
+                           //# текущий снимок
                            extractFromJSON(result,cb);
                        }
                    ],
                    (err,results)=>{
-                   console.log('aaaaaaaaaaaa');
+                   //console.log('aaaaaaaaaaaa');
+                   const resObject= {
+                       new_files: [],
+                       modyfied_files: [],
+                       deleted_files:[]
+                   };
+                   //сравниваем результирующие массивы:
+                       results[0].forEach((item,index,arr)=>{
+                           const found = results[1].find((element)=>{
+                               if(element.path===item.path)
+                               {
+                                   return true;
+                               }
+                           });
+                           if(found)
+                           {
+                               //нашли элемент в текущем снимке, сравниваем 2 снимка
+                               //let str = `file ${item.path} modyfied by:`;
+                               if(item.hash===found.hash)
+                               {
+                                   //файл не был изменен.
+                               }
+                               else
+                               {
+                                   if(!(item.mtime===found.mtime)) {
+                                       //файл был изменен - помещаем в объект для оповещения пользователя об этом
+                                       resObject.modyfied_files.push(found.path);
+                                   }
+                               }
+                           }
+                           else
+                           {
+                               //в прошлом снимке есть, в текущем - не найдено => файл был удален
+                                resObject.deleted_files.push(item.path);
+                           }
+                       });
+                       results[1].forEach((item,index,arr)=>{
+                           //теперь ищем измененные файлы, делая для каждого элемента нового снимка поиск в старом
+                           //если не найдено => файл новый
+                           const found = results[0].find((element)=>{
+                               if(element.path===item.path)
+                               {
+                                   return true;
+                               }
+                           });
+                           if(!found)
+                           {
+                               //заносим новый файл в список
+                               resObject.new_files.push(item.path);
+                           }
+
+                       });
+
+                       //сохраняем файл с изменениями и out.json
+                       //#hardcode
+                       fs.writeFile('./appsrv/checksum/shortLog.json',`{"${moment().format('MMMM Do YYYY, h:mm:ss a')}": \r\n ${JSON.stringify(resObject)} }`,(err,res)=>{
+                           if(err) throw err;
+                           //сохраняем новый снимок, перезаписывая старый
+                           fs.writeFile('./appsrv/checksum/out.json',JSON.stringify(result),(err,res)=> {
+                               if (err) throw err;
+                               console.log(`{Урра, все записано!} ${res}`);
+                           });
+                       });
+
                        /*fs.writeFile(JSON.stringify(results),(err,res)=>{
                            if(err) throw err;
                            console.log(`{Урра!} ${res}`);
